@@ -18,7 +18,9 @@
    - [2_weekly_customer_retention.sql](migrations/2_weekly_customer_retention.sql) - скрипт создания таблицы `mart.f_customer_retention`.
    - [3_duplicate_check.sql](migrations/3_duplicate_check.sql) - скрипт проверки дубликатов в таблицах `mart.f_sales` и `mart.f_customer_retention`.
 2) Папка `src` содержит исходные файлы проекта:
-    - Папка `dags` содержит DAG's Airflow.
+    - [src/dags](src/dags): DAG's Airflow
+    - [src/report](src/report): файлы отчета, скачанные по API
+    - [src/increment](src/increment): файлы инкремента отчета, скачанные по API
 
 ## Спецификация API для получения инкременов со статусом заказа
 
@@ -51,7 +53,9 @@ curl --location --request POST 'https://d5dg1j9kt695d30blp03.apigw.yandexcloud.n
 ID задачи, в результате выполнения которой должен сформироваться отчёт:
 
 ```json
-{"task_id":"MjAyNC0wMy0wM1QxMzoyMTozNQliYXJhbm92"}
+{
+    "task_id": "MjAyNC0wMy0wM1QxMzoyMTozNQliYXJhbm92"
+}
 ```
 
 ### 2. Получение отчёта после его формирования на сервере
