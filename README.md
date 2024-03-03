@@ -20,6 +20,117 @@
 2) Папка `src` содержит исходные файлы проекта:
     - Папка `dags` содержит DAG's Airflow.
 
+## Спецификация API для получения инкременов со статусом заказа
+
+Шаги получения инкрементов с информацией о продажах и статусом заказа (shipped/refunded) используется API:
+
+1) Инициализация формирования отчёта
+2) Получение отчёта после его формирования на сервере
+3) Получение данных за те даты, которые не вошли в основной отчёт
+
+Исходные данные для запросов:
+
+- `X-Nickname`: `baranov`
+- `X-Project`: `True`
+- `X-Cohort`: `23`
+- `X-API-KEY`: `5f55e6c0-e9e5-4a9c-b313-63c01fc31460`
+
+### 1. Инициализация формирования отчёта
+
+Метод `POST /generate_report`:
+
+```text
+curl --location --request POST 'https://d5dg1j9kt695d30blp03.apigw.yandexcloud.net/generate_report' \
+--header 'X-Nickname: baranov' \
+--header 'X-Cohort: 23' \
+--header 'X-Project: True' \
+--header 'X-API-KEY: 5f55e6c0-e9e5-4a9c-b313-63c01fc31460' \
+--data-raw ''
+```
+
+ID задачи, в результате выполнения которой должен сформироваться отчёт:
+
+```json
+{"task_id":"MjAyNC0wMy0wM1QxMzoyMTozNQliYXJhbm92"}
+```
+
+### 2. Получение отчёта после его формирования на сервере
+
+Метод `GET /get_report`:
+
+```text
+curl --location --request GET 'https://d5dg1j9kt695d30blp03.apigw.yandexcloud.net/get_report?task_id=MjAyNC0wMy0wM1QxMzoyMTozNQliYXJhbm92' \
+--header 'X-Nickname: baranov' \
+--header 'X-Cohort: 23' \
+--header 'X-Project: True' \
+--header 'X-API-KEY: 5f55e6c0-e9e5-4a9c-b313-63c01fc31460'
+```
+
+- Пока отчёт будет формироваться, будет возвращаться статус `RUNNING`.
+- Если отчёт сформирован, то метод вернёт статус `SUCCESS`, `report_id` и ссылки на скачивание файлов из параметра `s3_path`:
+  - [customer_research.csv](src/report/customer_research.csv)
+  - [user_order_log.csv](src/report/user_order_log.csv)
+  - [user_activity_log.csv](src/report/user_activity_log.csv)
+  - [price_log.csv](src/report/price_log.csv)
+
+```json
+{
+    "task_id": "MjAyNC0wMy0wM1QxMzoyMTozNQliYXJhbm92",
+    "status": "SUCCESS",
+    "data": {
+        "report_id": "TWpBeU5DMHdNeTB3TTFReE16b3lNVG96TlFsaVlYSmhibTky",
+        "start_day": "2024-02-02 00:00:00",
+        "end_date": "2024-02-24 00:00:00",
+        "s3_path": {
+            "customer_research": "https://storage.yandexcloud.net/s3-sprint3/cohort_23/baranov/project/TWpBeU5DMHdNeTB3TTFReE16b3lNVG96TlFsaVlYSmhibTky/customer_research.csv",
+            "user_order_log": "https://storage.yandexcloud.net/s3-sprint3/cohort_23/baranov/project/TWpBeU5DMHdNeTB3TTFReE16b3lNVG96TlFsaVlYSmhibTky/user_order_log.csv",
+            "user_activity_log": "https://storage.yandexcloud.net/s3-sprint3/cohort_23/baranov/project/TWpBeU5DMHdNeTB3TTFReE16b3lNVG96TlFsaVlYSmhibTky/user_activity_log.csv",
+            "price_log": "https://storage.yandexcloud.net/s3-sprint3/cohort_23/baranov/project/TWpBeU5DMHdNeTB3TTFReE16b3lNVG96TlFsaVlYSmhibTky/price_log.csv"
+        }
+    }
+}
+```
+
+Файлы также можно получить по URL самостоятельно по следующему шаблону: `<https://storage.yandexcloud.net/s3-sprint3/cohort_{{> your_cohort_number }}/{{ your_nickname }}/project/{{ report_id }}/{{ file_name }}`
+
+### 3. Получение данных за те даты, которые не вошли в основной отчёт
+
+Метод `GET /get_increment` с датой в формате `2020-01-22T00:00:00`:
+
+```text
+curl --location --request GET 'https://d5dg1j9kt695d30blp03.apigw.yandexcloud.net/get_increment?report_id=TWpBeU5DMHdNeTB3TTFReE16b3lNVG96TlFsaVlYSmhibTky=&date=2024-02-25T00:00:00' \
+--header 'X-Nickname: baranov' \
+--header 'X-Cohort: 23' \
+--header 'X-Project: True' \
+--header 'X-API-KEY: 5f55e6c0-e9e5-4a9c-b313-63c01fc31460'
+```
+
+- Если инкремент не сформируется, то вернётся `NOT FOUND` с описанием причины.
+- Если инкремент сформирован, то метод вернёт статус `SUCCESS`, `increment_id` и ссылки на скачивание файлов из параметра `s3_path`:
+  - [customer_research_inc.csv](src/increment/customer_research_inc.csv)
+  - [price_log_inc.csv](src/increment/price_log_inc.csv)
+  - [user_order_log_inc.csv](src/increment/user_order_log_inc.csv)
+  - [user_activity_log_inc.csv](src/increment/user_activity_log_inc.csv)
+
+```json
+{
+    "report_id": "TWpBeU5DMHdNeTB3TTFReE16b3lNVG96TlFsaVlYSmhibTky=",
+    "date": "2024-02-25 00:00:00",
+    "status": "SUCCESS",
+    "data": {
+        "increment_id": "MjAyNC0wMi0yNVQwMDowMDowMAlUV3BCZVU1RE1IZE5lVEIzVFRGUmVFMTZiM2xOVkc5NlRsRnNhVmxZU21oaWJUa3k9",
+        "s3_path": {
+            "customer_research_inc": "https://storage.yandexcloud.net/s3-sprint3/cohort_23/baranov/project/MjAyNC0wMi0yNVQwMDowMDowMAlUV3BCZVU1RE1IZE5lVEIzVFRGUmVFMTZiM2xOVkc5NlRsRnNhVmxZU21oaWJUa3k9/customer_research_inc.csv",
+            "user_order_log_inc": "https://storage.yandexcloud.net/s3-sprint3/cohort_23/baranov/project/MjAyNC0wMi0yNVQwMDowMDowMAlUV3BCZVU1RE1IZE5lVEIzVFRGUmVFMTZiM2xOVkc5NlRsRnNhVmxZU21oaWJUa3k9/user_order_log_inc.csv",
+            "user_activity_log_inc": "https://storage.yandexcloud.net/s3-sprint3/cohort_23/baranov/project/MjAyNC0wMi0yNVQwMDowMDowMAlUV3BCZVU1RE1IZE5lVEIzVFRGUmVFMTZiM2xOVkc5NlRsRnNhVmxZU21oaWJUa3k9/user_activity_log_inc.csv",
+            "price_log_inc": "https://storage.yandexcloud.net/s3-sprint3/cohort_23/baranov/project/TWpBeU5DMHdNeTB3TTFReE16b3lNVG96TlFsaVlYSmhibTky=/price_log_inc.csv"
+        }
+    }
+}
+```
+
+Файлы также можно получить по URL самостоятельно по следующему шаблону: `<https://storage.yandexcloud.net/s3-sprint3/cohort_{{> your_cohort_number }}/{{ your_nickname }}/project/{{ increment_id }}/{{ file_name }}`
+
 ## Этап 1
 
 ### Описание этапа
@@ -41,67 +152,6 @@
 - Таблица фактов `mart.f_sales` должна приобрести вид транзакционной таблицы фактов. Будьте внимательны со статусом `refunded`.
 - Чтобы total revenue правильно рассчитывался, строки с `refunded` добавляйте со знаком -.
 - Первый инкремент приходит со старым форматом данных — без статуса заказа. Проверьте, что ваш код правильно проставляет статус в этом случае.
-
-### Спецификация API
-
-#### POST /generate_report
-
-Метод `/generate_report` инициализирует формирование отчёта. В заголовке запроса нужно указать:
-
-- `X-Nickname`: `baranov`
-- `X-Project`: `True`
-- `X-Cohort`: `23`
-- `X-API-KEY`: `5f55e6c0-e9e5-4a9c-b313-63c01fc31460`
-
-Установите предварительно утилиту curl, чтобы с помощью неё обратиться к API. Выполните следующие команды в командной строке:
-
-```json
-curl --location --request POST '<https://d5dg1j9kt695d30blp03.apigw.yandexcloud.net/generate_report>' \
---header 'X-Nickname: {{ your_nickname }}' \
---header 'X-Cohort: {{ your_cohort_number }}' \
---header 'X-Project: True' \
---header 'X-API-KEY: {{ api_key }}' \
---data-raw ''
-```
-
-В качестве переменных, указанных в {{ }}, передайте ваши актуальные данные.
-Метод возвращает `task_id` — ID задачи, в результате выполнения которой должен сформироваться отчёт.
-
-#### GET /get_report
-
-Метод get_report используется для получения отчёта после того, как он будет сформирован на сервере.
-С помощью утилиты curl обратитесь к API:
-curl --location --request GET '<https://d5dg1j9kt695d30blp03.apigw.yandexcloud.net/get_report?task_id={{> task_id }}' \
---header 'X-Nickname: {{ your_nickname }}' \
---header 'X-Cohort: {{ your_cohort_number }}' \
---header 'X-Project: True' \
---header 'X-API-KEY: {{ api_key }}'
-Пока отчёт будет формироваться, будет возвращаться статус RUNNING.
-Если отчёт сформирован, то метод вернёт статус SUCCESS и report_id.
-Сформированный отчёт содержит четыре файла:
-customer_research.csv,
-user_order_log.csv,
-user_activity_log.csv,
-price_log.csv.
-Файлы отчетов можно получить по URL из параметра s3_path или сформировать URL самостоятельно по следующему шаблону:
-<https://storage.yandexcloud.net/s3-sprint3/cohort_{{> your_cohort_number }}/{{ your_nickname }}/project/{{ report_id }}/{{ file_name }}
-
-#### GET /get_increment
-
-Метод get_increment используется для получения данных за те даты, которые не вошли в основной отчёт. Дата обязательно в формате 2020-01-22T00:00:00.
-С помощью утилиты curl обратитесь к API:
-curl --location --request GET '<https://d5dg1j9kt695d30blp03.apigw.yandexcloud.net/get_increment?report_id={{> report_id }}&date={{ date }}' \
---header 'X-Nickname: {{ your_nickname }}' \
---header 'X-Cohort: {{ your_cohort_number }}' \
---header 'X-Project: True' \
---header 'X-API-KEY: {{ api_key }}'
-Если инкремент сформирован, то метод вернёт статус SUCCESS и increment_id. Если инкремент не сформируется, то вернётся NOT FOUND с описанием причины.
-Сформированный инкремент содержит три файла:
-customer_research_inc.csv,
-user_order_log_inc.csv,
-user_activity_log_inc.csv.
-Файлы отчетов можно получить по URL из параметра s3_path или сформировать URL самостоятельно по следующему шаблону:
-<https://storage.yandexcloud.net/s3-sprint3/cohort_{{> your_cohort_number }}/{{ your_nickname }}/project/{{ increment_id }}/{{ file_name }}
 
 ## Этап 2
 
@@ -138,6 +188,11 @@ user_activity_log_inc.csv.
 - `new_customers_revenue` — доход с новых клиентов.
 - `returning_customers_revenue` — доход с вернувшихся клиентов.
 - `customers_refunded` — количество возвратов клиентов.
+
+### Реализация
+
+1) Создание витрины `mart.f_customer_retention` для анализа возвращаемости клиентов.
+2) Удаление устаревших или уже обработанных записей из витрины `mart.f_customer_retention`.
 
 ## Этап 3 (опциональный)
 
