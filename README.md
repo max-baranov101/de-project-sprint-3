@@ -148,11 +148,10 @@ curl --location --request GET 'https://d5dg1j9kt695d30blp03.apigw.yandexcloud.ne
 
 Обновить процессы в пайплайне для дальнейшего развития системы магазина:
 
-- Единоразово загрузить данные отчета из ранее скаченного файла [user_order_log.csv](src/report/user_order_log.csv), которые были до появления нового признака статус заказа, в таблицу `staging.user_order_log` с помощью одноразовго скрипта [upload_user_order_log.py](src/upload_user_order_log.py), который расположен в одной папке со скачанными отчетами.
 - Добавить новые столбцы `status` в таблицы `staging.user_order_log` и `mart.f_sales`, если они еще не добавлены, с помощью скрипта [1_1_add_new_columns.sql](migrations/1_1_add_new_columns.sql)
 - Заменить код в существующем скрипте [mart.f_sales](migrations/0_update_mart_tables.sql) на новый [1_2_new_f_sales.sql](migrations/1_2_new_f_sales.sql), который учитывает инкремент со признаком статуса и пересчитывает сумму возвратов. Также новый скрипт проверяет удаляет существующие записи перед вставкой аналогичной, что позволяет избежать дубликатов.
+- Добавить в существующий DAG блок очистки данных со ссылкой на скрипт [1_2_del_user_order_log_by_date.sql](src/dags/sql/1_2_del_user_order_log_by_date.sql)
 - Добавить в существующий DAG актуальный `nickname` и `cohort`.
-- Изменить в существующем DAG на `start_date=datetime(2024, 2, 24, 0, 0, 0)`, так как предыдущий отчет (до введения признака статуса) оканчивался этой датой.
 - Запустить существующий DAG из Airflow.
 
 ### Реализация
