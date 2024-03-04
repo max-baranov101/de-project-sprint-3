@@ -12,6 +12,7 @@ BEGIN
 END
 $$;
 
+/*
 -- новый столбец в mart.f_sales
 DO $$
 BEGIN
@@ -25,3 +26,4 @@ BEGIN
     END IF;
 END
 $$;
+*/
