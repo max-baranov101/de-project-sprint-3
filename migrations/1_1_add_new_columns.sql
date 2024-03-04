@@ -1,4 +1,4 @@
--- Для staging.user_order_log
+-- новый столбец в staging.user_order_log
 DO $$
 BEGIN
     IF NOT EXISTS (
@@ -12,7 +12,7 @@ BEGIN
 END
 $$;
 
--- Для mart.f_sales
+-- новый столбец в mart.f_sales
 DO $$
 BEGIN
     IF NOT EXISTS (
