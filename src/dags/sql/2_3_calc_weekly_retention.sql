@@ -110,7 +110,7 @@ SELECT	c1.new_customers_count,
 	FROM cte1_view c1
 		-- учтена возможность отсутствия соответствия в c1 или c2 через COALESCE
 		FULL JOIN cte2_view c2 ON c1.week_of_year = c2.week_of_year AND c1.item_new = c2.item_returning
-		FULL JOIN cte3_view c3 ON coalesce(c1.week_of_year, c2.week_of_year) = c3.week_of_year AND coalesce(c1.item_new, c2.item_returning) = c3.item_refunding;
+		FULL JOIN cte3_view c3 ON coalesce(c1.week_of_year, c2.week_of_year) = c3.week_of_year AND coalesce(c1.item_new, c2.item_returning) = c3.item_refunding
 
 -- Удаление возможных дубликатов за неделю перед вставкой новых данных
 ON CONFLICT (period_id, item_id) DO UPDATE SET
