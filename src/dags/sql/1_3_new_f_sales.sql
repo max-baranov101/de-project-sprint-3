@@ -1,4 +1,8 @@
 -- Удаление возможных дубликатов за день '{{ds}}' перед вставкой новых данных
+DELETE FROM mart.f_sales 
+WHERE date_id::TEXT::DATE = '{{ds}}';  
+/*
+-- Прежний вариант
 delete from
   mart.f_sales
 where
@@ -11,7 +15,8 @@ where
     where
       uol.date_time :: Date = '{{ds}}'
   );
-  
+*/
+
 -- Вставка новых данных в витрину mart.f_sales
 insert into
   mart.f_sales (

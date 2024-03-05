@@ -1,6 +1,6 @@
 -- Расчет количества и выручки от новых клиентов
-DROP TABLE IF EXISTS cte1_temp;
-CREATE TEMP TABLE cte1_temp as
+DROP MATERIALIZED VIEW IF EXISTS cte1_view; -- исправлено на мат. вью
+CREATE MATERIALIZED VIEW cte1_view AS -- исправлено на мат. вью
 WITH cte1 AS ( 
 	SELECT 
 		c.week_of_year,
@@ -29,8 +29,8 @@ FROM cte1
 GROUP BY week_of_year,item_new;
 
 -- Расчет количества и выручки от вернувшихся клиентов
-DROP TABLE IF EXISTS cte2_temp;
-CREATE TEMP TABLE cte2_temp as
+DROP MATERIALIZED VIEW IF EXISTS cte2_view; -- исправлено на мат. вью
+CREATE MATERIALIZED VIEW cte2_view AS -- исправлено на мат. вью
 WITH cte2 AS ( 
 	SELECT 
 		c.week_of_year,
@@ -46,7 +46,7 @@ WITH cte2 AS (
 				   HAVING count(*)>1) f ON f.customer_id = FS.customer_id
 	WHERE 
 		quantity > 0
-   GROUP BY 	
+	GROUP BY 	
 		c.week_of_year,
 		FS.item_id,
 		FS.customer_id
@@ -59,8 +59,8 @@ FROM cte2
 GROUP BY week_of_year, item_returning;
 
 -- Расчет количества клиентов, оформивших возврат, и сумму возвратов
-DROP TABLE IF EXISTS cte3_temp;
-CREATE TEMP TABLE cte3_temp as
+DROP MATERIALIZED VIEW IF EXISTS cte3_view; -- исправлено на мат. вью
+CREATE MATERIALIZED VIEW cte3_view AS -- исправлено на мат. вью
 WITH cte3 AS 
 ( 
 	SELECT 
@@ -76,7 +76,7 @@ WITH cte3 AS
 				   GROUP BY customer_id) f ON f.customer_id = FS.customer_id
 	WHERE 
 		quantity < 0
-   GROUP BY 	
+	GROUP BY 	
 		c.week_of_year,
 		FS.item_id,
 		FS.customer_id
@@ -102,11 +102,21 @@ INSERT INTO mart.f_customer_retention (
 SELECT	c1.new_customers_count,
 		c2.returning_customers_count,
 		c3.refunded_customer_count,
-		c1.week_of_year,
-		coalesce(c1.item_new, c2.item_returning) AS item_id,
+		c1.week_of_year AS period_id,
+		coalesce(c1.item_new, c2.item_returning, c3.item_refunding) AS item_id,
 		c1.new_customers_revenue,
 		c2.returning_customers_revenue,
 		c3.customers_refunded
-	FROM cte1_temp c1
-		FULL JOIN cte2_temp c2 ON c1.week_of_year = c2.week_of_year AND c1.item_new = c2.item_returning
-		FULL JOIN cte3_temp c3 ON c1.week_of_year = c3.week_of_year AND c1.item_new = c3.item_refunding;
+	FROM cte1_view c1
+		-- учтена возможность отсутствия соответствия в c1 или c2 через COALESCE
+		FULL JOIN cte2_view c2 ON c1.week_of_year = c2.week_of_year AND c1.item_new = c2.item_returning
+		FULL JOIN cte3_view c3 ON coalesce(c1.week_of_year, c2.week_of_year) = c3.week_of_year AND coalesce(c1.item_new, c2.item_returning) = c3.item_refunding;
+
+-- Удаление возможных дубликатов за неделю перед вставкой новых данных
+ON CONFLICT (period_id, item_id) DO UPDATE SET
+  new_customers_count = EXCLUDED.new_customers_count,
+  returning_customers_count = EXCLUDED.returning_customers_count,
+  refunded_customer_count = EXCLUDED.refunded_customer_count,
+  new_customers_revenue = EXCLUDED.new_customers_revenue,
+  returning_customers_revenue = EXCLUDED.returning_customers_revenue,
+  customers_refunded = EXCLUDED.customers_refunded;

@@ -14,7 +14,7 @@ args = {
     'email': ['student@example.com'],
     'email_on_failure': False,
     'email_on_retry': False,
-    'retries': 0
+    'retries': 5 # Изменено на 5 попыток
 }
 
 with DAG(
@@ -23,7 +23,9 @@ with DAG(
         description='Calculate customer retention mart.f_customer_retention',
         catchup=True,
         start_date=datetime.today() - timedelta(days=1),
-        schedule_interval = "30 8 * * MON"
+        schedule_interval = "30 8 * * *"  # Изменено на ежедневный запуск в 8:30
+        # schedule_interval = "30 8 * * MON"
+
 ) as dag:
 
     del_old_retention = PostgresOperator(

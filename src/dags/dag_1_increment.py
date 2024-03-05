@@ -2,6 +2,7 @@ import time
 import requests
 import json
 import pandas as pd
+import logging
 
 from datetime import datetime, timedelta
 from airflow import DAG
@@ -13,6 +14,8 @@ from airflow.hooks.http_hook import HttpHook
 http_conn_id = HttpHook.get_connection('http_conn_id')
 api_key = http_conn_id.extra_dejson.get('api_key')
 base_url = http_conn_id.host
+
+tsk_logger = logging.getLogger('airflow.task')
 
 postgres_conn_id = 'postgresql_de'
 
@@ -29,7 +32,7 @@ headers = {
 
 
 def generate_report(ti):
-    print('Making request generate_report')
+    tsk_logger.info('Making request generate_report')
 
     response = requests.post(f'{base_url}/generate_report', headers=headers)
     response.raise_for_status()
@@ -39,7 +42,7 @@ def generate_report(ti):
 
 
 def get_report(ti):
-    print('Making request get_report')
+    tsk_logger.info('Making request get_report')
     task_id = ti.xcom_pull(key='task_id')
 
     report_id = None
@@ -63,7 +66,7 @@ def get_report(ti):
 
 
 def get_increment(date, ti):
-    print('Making request get_increment')
+    tsk_logger.info('Making request get_increment')
     report_id = ti.xcom_pull(key='report_id')
     response = requests.get(
         f'{base_url}/get_increment?report_id={report_id}&date={str(date)}T00:00:00',
@@ -108,7 +111,7 @@ args = {
     'email': ['student@example.com'],
     'email_on_failure': False,
     'email_on_retry': False,
-    'retries': 0
+    'retries': 5 # Изменено на 5 попыток
 }
 
 business_dt = '{{ ds }}'
@@ -120,6 +123,8 @@ with DAG(
         catchup=True,
         start_date=datetime.today() - timedelta(days=7),
         end_date=datetime.today() - timedelta(days=1),
+        max_active_runs=1,  # Добавленный параметр для контроля за одновременным выполнением
+
 ) as dag:
     generate_report = PythonOperator(
         task_id='generate_report',
@@ -148,6 +153,16 @@ with DAG(
         postgres_conn_id=postgres_conn_id,
         sql="sql/1_2_del_user_order_log_by_date.sql")
 
+    # ДОБАВЛЕНО
+    dimension_tasks = []
+    for dimension_table in ['d_city', 'd_item', 'd_customer']:
+        task = PostgresOperator(
+            task_id=f'update_{dimension_table}',
+            postgres_conn_id=postgres_conn_id,
+            sql=f"sql/mart.{dimension_table}.sql")
+        dimension_tasks.append(task)
+    
+    """
     update_d_item_table = PostgresOperator(
         task_id='update_d_item',
         postgres_conn_id=postgres_conn_id,
@@ -162,7 +177,8 @@ with DAG(
         task_id='update_d_city',
         postgres_conn_id=postgres_conn_id,
         sql="sql/mart.d_city.sql")
-
+	"""
+    
     # ИЗМЕНЕНА ССЫЛКА НА НОВЫЙ СКРИПТ
     update_f_sales = PostgresOperator(
         task_id='update_f_sales',
@@ -177,6 +193,7 @@ with DAG(
             >> get_increment
             >> del_stg_user_order_log
             >> upload_user_order_inc
-            >> [update_d_item_table, update_d_city_table, update_d_customer_table]
+            # >> [update_d_item_table, update_d_city_table, update_d_customer_table]
+            >> dimension_tasks # ИЗМЕНЕНО НА dimension_tasks
             >> update_f_sales
     )

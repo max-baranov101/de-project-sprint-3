@@ -1,8 +1,5 @@
--- Полное удаление данных в витрине
-TRUNCATE TABLE mart.f_customer_retention
+-- Ресурсоэкономное удаление устаревших или уже обработанных записей из витрины
 
--- Удаление устаревших или уже обработанных записей из витрины
-/*
 DELETE FROM
   mart.f_customer_retention
 WHERE
@@ -15,4 +12,6 @@ WHERE
     WHERE
       uol.date_time :: DATE = '{{ds}}'
   );
-  */
+
+-- Полное удаление данных в витрине (но затратное по ресурсам)
+-- TRUNCATE TABLE mart.f_customer_retention

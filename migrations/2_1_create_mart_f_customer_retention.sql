@@ -9,4 +9,6 @@ CREATE TABLE IF NOT EXISTS mart.f_customer_retention(
 	new_customers_revenue NUMERIC(14, 2) NULL,
 	returning_customers_revenue NUMERIC(14, 2) NULL,
 	customers_refunded INT NULL
+	PRIMARY KEY(period_id, item_id) -- уникальный ключ
+	-- UNIQUE(period_id, item_id) -- альтернативный вариант
 );
